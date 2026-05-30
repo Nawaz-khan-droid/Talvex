@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Database (use Docker volume instead)
+db/*.db
+db/*.db-journal
+pgdata/
+
+# Uploads
+public/uploads/
+
+# Misc
+.git/
+.gitignore
+*.md
+download/
+upload/
+scripts/
+examples/
+agent-ctx/
+mini-services/
+
+# Docker
+docker-compose*.yml
+Dockerfile
+backend/Dockerfile
+.dockerignore
+
+# Logs
+*.log
+dev.log
+server.log

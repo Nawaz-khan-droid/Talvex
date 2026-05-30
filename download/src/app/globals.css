@@ -1,0 +1,177 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Material 3 Design Tokens for Tailwind CSS 4 ── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-roboto), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* M3 custom color tokens */
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--border);
+  --color-error-container: var(--error-container);
+  /* M3 semantic aliases (map to existing shadcn tokens) */
+  --color-surface: var(--background);
+  --color-on-surface: var(--foreground);
+  --color-on-surface-variant: var(--muted-foreground);
+  /* M3 shape tokens */
+  --radius-sm: 0.25rem;   /* 4px  - M3 rounded-4 (Extra Small) */
+  --radius-md: 0.5rem;    /* 8px  - M3 rounded-8 (Small) */
+  --radius-lg: 0.75rem;   /* 12px - M3 rounded-12 (Medium) */
+  --radius-xl: 1rem;      /* 16px - M3 rounded-16 (Large) */
+  --radius-2xl: 1.25rem;  /* 20px - M3 rounded-20 (Extra Large) */
+  --radius-3xl: 1.75rem;  /* 28px - M3 rounded-28 (Full) */
+}
+
+/* ── Material 3 Light Theme ── */
+:root {
+  --radius: 0.75rem;
+  /* Core M3 mappings */
+  --background: #FEF7FF;              /* Surface */
+  --foreground: #1D1B20;              /* On Surface */
+  --card: #FEF7FF;                    /* Surface (Container Low) */
+  --card-foreground: #1D1B20;         /* On Surface */
+  --popover: #F3EDF7;                 /* Surface Container */
+  --popover-foreground: #1D1B20;      /* On Surface */
+  --primary: #6750A4;                 /* Primary */
+  --primary-foreground: #FFFFFF;       /* On Primary */
+  --secondary: #625B71;               /* Secondary */
+  --secondary-foreground: #FFFFFF;     /* On Secondary */
+  --muted: #F3EDF7;                   /* Surface Container */
+  --muted-foreground: #49454F;        /* On Surface Variant */
+  --accent: #E8DEF8;                  /* Secondary Container */
+  --accent-foreground: #1D192B;       /* On Secondary Container */
+  --destructive: #B3261E;             /* Error */
+  --destructive-foreground: #FFFFFF;   /* On Error */
+  --border: #CAC4D0;                  /* Outline Variant */
+  --input: #79747E;                   /* Outline */
+  --ring: #6750A4;                    /* Primary */
+  /* M3 extended tokens */
+  --primary-container: #EADDFF;       /* Primary Container */
+  --on-primary-container: #21005D;    /* On Primary Container */
+  --secondary-container: #E8DEF8;      /* Secondary Container */
+  --on-secondary-container: #1D192B;  /* On Secondary Container */
+  --tertiary: #7D5260;                /* Tertiary */
+  --tertiary-container: #FFD8E4;      /* Tertiary Container */
+  --surface-container: #F3EDF7;       /* Surface Container */
+  --surface-container-high: #ECE6F0;  /* Surface Container High */
+  --surface-container-highest: #E6E0E9; /* Surface Container Highest */
+  --outline: #79747E;                 /* Outline */
+  --error-container: #F9DEDC;         /* Error Container */
+  /* Chart colors (M3-inspired palette) */
+  --chart-1: #6750A4;                 /* Primary */
+  --chart-2: #7D5260;                 /* Tertiary */
+  --chart-3: #625B71;                 /* Secondary */
+  --chart-4: #9A82DB;                 /* Primary lighter */
+  --chart-5: #B4A0D4;                 /* Primary even lighter */
+  /* Sidebar */
+  --sidebar: #FEF7FF;                 /* Surface */
+  --sidebar-foreground: #1D1B20;      /* On Surface */
+  --sidebar-primary: #6750A4;         /* Primary */
+  --sidebar-primary-foreground: #FFFFFF; /* On Primary */
+  --sidebar-accent: #F3EDF7;          /* Surface Container */
+  --sidebar-accent-foreground: #1D192B; /* On Secondary Container */
+  --sidebar-border: #CAC4D0;          /* Outline Variant */
+  --sidebar-ring: #6750A4;            /* Primary */
+}
+
+/* ── Material 3 Dark Theme ── */
+.dark {
+  --background: #141218;              /* Surface */
+  --foreground: #E6E0E9;              /* On Surface */
+  --card: #1E1B1E;                    /* Surface Container Low */
+  --card-foreground: #E6E0E9;         /* On Surface */
+  --popover: #211F26;                 /* Surface Container */
+  --popover-foreground: #E6E0E9;      /* On Surface */
+  --primary: #D0BCFF;                 /* Primary */
+  --primary-foreground: #381E72;       /* On Primary */
+  --secondary: #CCC2DC;               /* Secondary */
+  --secondary-foreground: #332D41;     /* On Secondary */
+  --muted: #211F26;                   /* Surface Container */
+  --muted-foreground: #CAC4D0;        /* On Surface Variant */
+  --accent: #4A4458;                  /* Secondary Container */
+  --accent-foreground: #E8DEF8;       /* On Secondary Container */
+  --destructive: #F2B8B5;             /* Error */
+  --destructive-foreground: #601410;  /* On Error */
+  --border: #49454F;                  /* Outline Variant */
+  --input: #938F99;                   /* Outline */
+  --ring: #D0BCFF;                    /* Primary */
+  /* M3 extended tokens */
+  --primary-container: #4F378B;       /* Primary Container */
+  --on-primary-container: #EADDFF;    /* On Primary Container */
+  --secondary-container: #4A4458;      /* Secondary Container */
+  --on-secondary-container: #E8DEF8;  /* On Secondary Container */
+  --tertiary: #EFB8C8;                /* Tertiary */
+  --tertiary-container: #633B48;      /* Tertiary Container */
+  --surface-container: #211F26;       /* Surface Container */
+  --surface-container-high: #2B2930;  /* Surface Container High */
+  --surface-container-highest: #36343B; /* Surface Container Highest */
+  --outline: #938F99;                 /* Outline */
+  --error-container: #8C1D18;         /* Error Container */
+  /* Chart colors (M3 dark palette) */
+  --chart-1: #D0BCFF;                /* Primary */
+  --chart-2: #EFB8C8;                /* Tertiary */
+  --chart-3: #CCC2DC;                 /* Secondary */
+  --chart-4: #B8A9E0;                 /* Primary muted */
+  --chart-5: #9689C4;                 /* Primary darker */
+  /* Sidebar */
+  --sidebar: #141218;                 /* Surface */
+  --sidebar-foreground: #E6E0E9;      /* On Surface */
+  --sidebar-primary: #D0BCFF;         /* Primary */
+  --sidebar-primary-foreground: #381E72; /* On Primary */
+  --sidebar-accent: #211F26;          /* Surface Container */
+  --sidebar-accent-foreground: #E8DEF8; /* On Secondary Container */
+  --sidebar-border: #49454F;          /* Outline Variant */
+  --sidebar-ring: #D0BCFF;            /* Primary */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

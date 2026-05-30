@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{full_name}} — Chronological Resume</title>
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* ===== PRINT SETTINGS ===== */
+    @page {
+      margin: 0.75in;
+      size: letter;
+    }
+
+    body {
+      font-family: 'Calibri', Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #333;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ===== PAGE BREAK ===== */
+    .page-break {
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* ===== LAYOUT ===== */
+    .resume {
+      max-width: 8.5in;
+      margin: 0 auto;
+    }
+
+    /* ===== HEADER / NAME ===== */
+    .resume-header {
+      text-align: center;
+      margin-bottom: 12pt;
+      padding-bottom: 8pt;
+      border-bottom: 2px solid #2c3e50;
+    }
+
+    .resume-header h1 {
+      font-size: 24pt;
+      font-weight: 700;
+      color: #2c3e50;
+      letter-spacing: 1px;
+      margin-bottom: 4pt;
+    }
+
+    .contact-info {
+      font-size: 10pt;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .contact-info a {
+      color: #2c3e50;
+      text-decoration: none;
+    }
+
+    .contact-info a:hover {
+      text-decoration: underline;
+    }
+
+    .contact-separator {
+      margin: 0 4pt;
+      color: #999;
+    }
+
+    /* ===== SECTION HEADERS ===== */
+    .section {
+      margin-top: 14pt;
+      margin-bottom: 8pt;
+    }
+
+    .section-title {
+      font-size: 14pt;
+      font-weight: 700;
+      color: #2c3e50;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #2c3e50;
+      padding-bottom: 3pt;
+      margin-bottom: 8pt;
+    }
+
+    /* ===== PROFESSIONAL SUMMARY ===== */
+    .summary-text {
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #333;
+    }
+
+    /* ===== WORK EXPERIENCE ===== */
+    .job-entry {
+      margin-bottom: 10pt;
+    }
+
+    .job-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .job-title {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .job-company {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #444;
+    }
+
+    .job-date {
+      font-size: 10pt;
+      color: #666;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .job-location {
+      font-size: 10pt;
+      color: #666;
+      font-style: italic;
+      margin-bottom: 4pt;
+    }
+
+    /* ===== BULLET POINTS ===== */
+    .achievements {
+      margin-top: 4pt;
+      padding-left: 0.25in;
+    }
+
+    .achievements li {
+      margin-bottom: 2pt;
+      line-height: 1.4;
+      font-size: 11pt;
+    }
+
+    /* ===== SKILLS ===== */
+    .skills-subsection {
+      margin-bottom: 6pt;
+    }
+
+    .skills-subsection-title {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #444;
+      margin-bottom: 3pt;
+    }
+
+    .skills-list {
+      padding-left: 0.25in;
+      line-height: 1.45;
+    }
+
+    .skills-list li {
+      margin-bottom: 1pt;
+      font-size: 11pt;
+    }
+
+    /* ===== EDUCATION ===== */
+    .edu-entry {
+      margin-bottom: 8pt;
+    }
+
+    .edu-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .edu-degree {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .edu-school {
+      font-size: 11pt;
+      color: #444;
+    }
+
+    .edu-date {
+      font-size: 10pt;
+      color: #666;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .edu-details {
+      font-size: 10pt;
+      color: #666;
+      margin-top: 1pt;
+    }
+
+    /* ===== PRINT MEDIA QUERY ===== */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .resume-header {
+        border-bottom: 2px solid #2c3e50;
+      }
+
+      .section-title {
+        border-bottom: 2px solid #2c3e50;
+      }
+
+      .contact-info a {
+        color: #2c3e50;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="resume">
+
+    <!-- ========== HEADER ========== -->
+    <header class="resume-header">
+      <h1>{{full_name}}</h1>
+      <div class="contact-info">
+        <span>{{location}}</span>
+        <span class="contact-separator">|</span>
+        <span>{{phone}}</span>
+        <span class="contact-separator">|</span>
+        <a href="mailto:{{email}}">{{email}}</a>
+        {% if linkedin %}
+        <span class="contact-separator">|</span>
+        <a href="{{linkedin}}" target="_blank">LinkedIn</a>
+        {% endif %}
+        {% if portfolio %}
+        <span class="contact-separator">|</span>
+        <a href="{{portfolio}}" target="_blank">Portfolio</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- ========== PROFESSIONAL SUMMARY ========== -->
+    <section class="section">
+      <h2 class="section-title">Professional Summary</h2>
+      <p class="summary-text">{{professional_summary}}</p>
+    </section>
+
+    <!-- ========== WORK EXPERIENCE ========== -->
+    <section class="section">
+      <h2 class="section-title">Work Experience</h2>
+      {{work_experience}}
+    </section>
+
+    <!-- ========== SKILLS ========== -->
+    <section class="section">
+      <h2 class="section-title">Skills</h2>
+      {{skills_section}}
+    </section>
+
+    <!-- ========== EDUCATION ========== -->
+    <section class="section">
+      <h2 class="section-title">Education</h2>
+      {{education}}
+    </section>
+
+    {% if page_count == "2" %}
+    <div class="page-break"></div>
+    {% endif %}
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,194 @@
+# TALVEX — Full-Stack Docker Compose (Phase 8 — Production Hardened)
+# Usage: docker compose up -d
+#
+# Services:
+#   talvex-nginx    — Nginx reverse proxy (port 80)
+#   talvex-redis    — Redis 7 (PII vault, sessions, rate limiting, quotas, ARQ)
+#   talvex-db       — PostgreSQL 16 (persistent data)
+#   talvex-backend  — FastAPI Python backend (port 8000)
+#   talvex-worker   — ARQ background worker (resume generation, scraping)
+#   talvex-frontend — Next.js 16 frontend  (port 3000)
+#   talvex-bot      — Telegram bot (depends on backend)
+
+services:
+  # ── Nginx Reverse Proxy ──────────────────────────────────
+  talvex-nginx:
+    image: nginx:alpine
+    container_name: talvex-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - talvex-frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Redis 7 ─────────────────────────────────────────────
+  talvex-redis:
+    image: redis:7-alpine
+    container_name: talvex-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    # Security: read-only root filesystem with tmpfs for Redis temp files
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgreSQL 16 ────────────────────────────────────────
+  talvex-db:
+    image: postgres:16-alpine
+    container_name: talvex-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-talvex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR-POSTGRES_PASSWORD-required}
+      POSTGRES_DB: ${POSTGRES_DB:-talvex}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-talvex} -d ${POSTGRES_DB:-talvex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ──────────────────────────────────────
+  talvex-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: talvex-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to use Docker service hostname
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-talvex}:${POSTGRES_PASSWORD}@talvex-db:5432/${POSTGRES_DB:-talvex}
+      REDIS_URL: redis://talvex-redis:6379/0
+      # CRITICAL: This key MUST be static across restarts.
+      PII_VAULT_MASTER_KEY: ${PII_VAULT_MASTER_KEY:-}
+      # Zero Trust — Phase 7
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?ERROR-JWT_SECRET_KEY-required}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://talvex-frontend:3000}
+      # Admin bootstrap
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      talvex-db:
+        condition: service_healthy
+      talvex-redis:
+        condition: service_healthy
+    volumes:
+      # Mount backend source for dev hot-reload (comment out for prod)
+      - ./backend:/app/backend
+      - ./db:/app/db
+      - ./backend/logs:/app/logs
+    command: >
+      sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── ARQ Background Worker ────────────────────────────────
+  talvex-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: talvex-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-talvex}:${POSTGRES_PASSWORD}@talvex-db:5432/${POSTGRES_DB:-talvex}
+      REDIS_URL: redis://talvex-redis:6379/0
+      PII_VAULT_MASTER_KEY: ${PII_VAULT_MASTER_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?ERROR-JWT_SECRET_KEY-required}
+    depends_on:
+      talvex-db:
+        condition: service_healthy
+      talvex-redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./db:/app/db
+      - ./backend/logs:/app/logs
+    working_dir: /app/backend
+    command: >
+      arq worker.WorkerSettings
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── Next.js Frontend ─────────────────────────────────────
+  talvex-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: talvex-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - talvex-backend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── Telegram Bot ─────────────────────────────────────────
+  talvex-bot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: talvex-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-talvex}:${POSTGRES_PASSWORD}@talvex-db:5432/${POSTGRES_DB:-talvex}
+      REDIS_URL: redis://talvex-redis:6379/0
+      PII_VAULT_MASTER_KEY: ${PII_VAULT_MASTER_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BACKEND_URL: http://talvex-backend:8000
+    depends_on:
+      - talvex-backend
+    working_dir: /app/backend
+    command: >
+      sh -c "python telegram_bot.py"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  pgdata:
+  redisdata:
