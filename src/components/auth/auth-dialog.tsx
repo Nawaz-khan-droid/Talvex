@@ -53,7 +53,7 @@ export function logoutAuth() {
   _emitChange();
 }
 
-function AuthDialog({ open, onOpenChange, onAuthSuccess }: AuthDialogProps) {
+export function AuthDialog({ open, onOpenChange, onAuthSuccess }: AuthDialogProps) {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
