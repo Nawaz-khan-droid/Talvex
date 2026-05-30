@@ -12,8 +12,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build Next.js (standalone output)
-RUN bun run build
+# Build Next.js using npm (since packages are already installed)
+RUN npm run build
 
 # ── Stage 3: Production ─────────────────────────────────────
 FROM node:22-alpine AS runner
