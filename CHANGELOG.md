@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 |---|------|-------|-----|
 | U1 | `src/components/analytics/analytics-components.tsx` | Recharts Tooltip/Bar used `hsl(var(--popover))` but CSS tokens are hex values — tooltips rendered with invisible/transparent backgrounds | Changed to `var(--popover)`, `var(--border)`, `var(--primary)` direct references |
 | U2 | `src/components/analytics/analytics-components.tsx` | CartesianGrid `className="stroke-muted"` and XAxis/YAxis `className="fill-muted-foreground"` are not valid recharts SVG props — colors silently fail | Changed to `stroke="var(--border)"` and `tick={{ fill: 'var(--muted-foreground)' }}` |
-| U3 | `src/components/ingest/ingest-components.tsx` | Label said "AI-Powered Parsing (z.ai GLM)" — misleading branding, TALVEX uses OpenRouter not z-ai-web-dev-sdk | Changed to "AI-Powered Parsing (OpenRouter)" |
+| U3 | `src/components/ingest/ingest-components.tsx` | Label used legacy GLM branding — misleading because TALVEX uses OpenRouter | Changed to "AI-Powered Parsing (OpenRouter)" |
 | U4 | `src/lib/types.ts` | `PlatformInfo.priority` type missing `"low"` — TypeScript error on manual entry platform | Added `"low"` to union type |
 | U5 | `src/components/onboarding/onboarding-wizard.tsx` | `showCloseButton` prop on DialogContent is not a standard shadcn/ui prop — ignored at runtime but generates TS warning | Removed invalid prop |
 

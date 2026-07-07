@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
+
+import redis as redis_py
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +83,7 @@ class InMemoryRateLimiter:
         default_daily: int = 1000,
         default_per_minute: int = 60,
         cleanup_interval: int = 3600,
+        enable_redis_persistence: bool = True,
     ) -> None:
         self._default_daily = default_daily
         self._default_per_minute = default_per_minute
@@ -87,6 +91,10 @@ class InMemoryRateLimiter:
         self._lock = threading.Lock()
         self._buckets: dict[str, ServiceBucket] = {}
         self._last_cleanup = time.monotonic()
+        self._redis_enabled = enable_redis_persistence
+        self._redis_client: redis_py.Redis | None = None
+        if enable_redis_persistence:
+            self._redis_client = self._create_redis_client()
 
     def configure_service(
         self, service: str, daily: int, per_minute: int, min_interval: float = 0.0
@@ -102,6 +110,8 @@ class InMemoryRateLimiter:
     async def acquire(self, service: str) -> bool:
         """Block until a token is available, then consume it.  Never raises."""
         bucket = self._ensure_bucket(service)
+        if self._redis_client is not None:
+            return await self._acquire_with_redis(service, bucket)
         while True:
             with self._lock:
                 can, wait = self._check(bucket)
@@ -113,6 +123,121 @@ class InMemoryRateLimiter:
             if wait > 0:
                 logger.warning("Rate limit reached for '%s'; sleeping %.1fs", service, wait)
                 await asyncio.sleep(wait)
+
+    def _create_redis_client(self) -> redis_py.Redis | None:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        try:
+            client = redis_py.Redis.from_url(redis_url, decode_responses=True)
+            client.ping()
+            logger.info("RateLimiter using Redis-backed persistence.")
+            return client
+        except Exception as exc:
+            logger.warning(
+                "RateLimiter Redis unavailable; falling back to in-memory only: %s",
+                exc,
+            )
+            return None
+
+    def _redis_key(self, service: str) -> str:
+        return f"talvex:rate_limiter:{service}"
+
+    def _load_redis_state(self, service: str, bucket: ServiceBucket) -> dict[str, float]:
+        assert self._redis_client is not None
+        now = time.time()
+        raw = self._redis_client.hgetall(self._redis_key(service))
+        if not raw:
+            state = {
+                "minute_tokens": bucket.minute.max_tokens,
+                "minute_last_refill": now,
+                "day_tokens": bucket.day.max_tokens,
+                "day_last_refill": now,
+                "last_call": 0.0,
+            }
+            self._redis_client.hset(self._redis_key(service), mapping={k: str(v) for k, v in state.items()})
+            self._redis_client.expire(self._redis_key(service), 7 * 86400)
+            return state
+
+        def _f(name: str, default: float) -> float:
+            try:
+                return float(raw.get(name, default))
+            except (TypeError, ValueError):
+                return default
+
+        return {
+            "minute_tokens": _f("minute_tokens", bucket.minute.max_tokens),
+            "minute_last_refill": _f("minute_last_refill", now),
+            "day_tokens": _f("day_tokens", bucket.day.max_tokens),
+            "day_last_refill": _f("day_last_refill", now),
+            "last_call": _f("last_call", 0.0),
+        }
+
+    def _save_redis_state(self, service: str, state: dict[str, float]) -> None:
+        assert self._redis_client is not None
+        self._redis_client.hset(self._redis_key(service), mapping={k: str(v) for k, v in state.items()})
+        self._redis_client.expire(self._redis_key(service), 7 * 86400)
+
+    @staticmethod
+    def _apply_redis_refill(tokens: float, max_tokens: float, refill_rate: float, now: float, last_refill: float) -> tuple[float, float]:
+        elapsed = max(0.0, now - last_refill)
+        if elapsed > 0:
+            tokens = min(max_tokens, tokens + elapsed * refill_rate)
+            last_refill = now
+        return tokens, last_refill
+
+    async def _acquire_with_redis(self, service: str, bucket: ServiceBucket) -> bool:
+        assert self._redis_client is not None
+        while True:
+            wait = 0.0
+            try:
+                with self._lock:
+                    now = time.time()
+                    state = self._load_redis_state(service, bucket)
+
+                    minute_tokens, minute_last = self._apply_redis_refill(
+                        state["minute_tokens"],
+                        bucket.minute.max_tokens,
+                        bucket.minute.refill_rate,
+                        now,
+                        state["minute_last_refill"],
+                    )
+                    day_tokens, day_last = self._apply_redis_refill(
+                        state["day_tokens"],
+                        bucket.day.max_tokens,
+                        bucket.day.refill_rate,
+                        now,
+                        state["day_last_refill"],
+                    )
+
+                    wait_minute = 0.0 if minute_tokens >= 1.0 else (1.0 - minute_tokens) / max(bucket.minute.refill_rate, 1e-9)
+                    wait_day = 0.0 if day_tokens >= 1.0 else (1.0 - day_tokens) / max(bucket.day.refill_rate, 1e-9)
+                    wait_interval = 0.0
+                    if bucket.min_interval > 0 and state["last_call"] > 0:
+                        since = now - state["last_call"]
+                        if since < bucket.min_interval:
+                            wait_interval = bucket.min_interval - since
+
+                    wait = max(wait_minute, wait_day, wait_interval)
+                    if wait <= 0:
+                        minute_tokens -= 1.0
+                        day_tokens -= 1.0
+                        self._save_redis_state(
+                            service,
+                            {
+                                "minute_tokens": minute_tokens,
+                                "minute_last_refill": minute_last,
+                                "day_tokens": day_tokens,
+                                "day_last_refill": day_last,
+                                "last_call": now,
+                            },
+                        )
+                        return True
+            except Exception as exc:
+                logger.warning("RateLimiter Redis persistence failed; using in-memory fallback: %s", exc)
+                self._redis_client = None
+                return await self.acquire(service)
+
+            logger.warning("Rate limit reached for '%s'; sleeping %.1fs", service, wait)
+            await asyncio.sleep(wait)
 
     def _check(self, bucket: ServiceBucket) -> tuple[bool, float]:
         """Under lock: return (can_acquire, wait_seconds)."""

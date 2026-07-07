@@ -16,9 +16,10 @@ import traceback
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from auth import get_current_user
+from schemas import sanitize_and_validate_llm_text
 from services.llm_service import llm_service
 from services.resume_optimizer import resume_optimizer
 
@@ -34,6 +35,11 @@ class ClassifyEmailRequest(BaseModel):
     email_body: str = Field(..., alias="emailBody", min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("email_body")
+    @classmethod
+    def _validate_email_body(cls, value: str) -> str:
+        return sanitize_and_validate_llm_text(value, "emailBody")
 
 
 class ClassifyEmailResponse(BaseModel):
@@ -51,6 +57,11 @@ class CoverLetterRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    @field_validator("resume_text", "job_description", "company", "role")
+    @classmethod
+    def _validate_cover_letter_inputs(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
+
 
 class CoverLetterResponse(BaseModel):
     cover_letter: str = Field(alias="coverLetter")
@@ -62,6 +73,11 @@ class AnalyzeJdRequest(BaseModel):
     job_description: str = Field(..., alias="jobDescription", min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("job_description")
+    @classmethod
+    def _validate_jd(cls, value: str) -> str:
+        return sanitize_and_validate_llm_text(value, "jobDescription")
 
 
 class AnalyzeJdResponse(BaseModel):
@@ -81,6 +97,11 @@ class FollowUpRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    @field_validator("company", "role")
+    @classmethod
+    def _validate_follow_up_text_fields(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
+
 
 class FollowUpResponse(BaseModel):
     follow_up_email: str = Field(alias="followUpEmail")
@@ -94,6 +115,11 @@ class InterviewPrepRequest(BaseModel):
     role: str = Field(..., min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("job_description", "company", "role")
+    @classmethod
+    def _validate_interview_prep_inputs(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
 
 
 class InterviewPrepQuestion(BaseModel):
@@ -114,6 +140,11 @@ class ResumeTipsRequest(BaseModel):
     job_description: str = Field(..., alias="jobDescription", min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("resume_text", "job_description")
+    @classmethod
+    def _validate_resume_tips_inputs(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
 
 
 class ResumeTipsResponse(BaseModel):
@@ -138,6 +169,11 @@ class OptimizeResumeRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    @field_validator("resume_text", "job_description")
+    @classmethod
+    def _validate_optimize_resume_inputs(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
+
 
 class OptimizeResumeResponse(BaseModel):
     optimized_text: str = Field(alias="optimizedText")
@@ -158,6 +194,11 @@ class OptimizedCoverLetterRequest(BaseModel):
     role: str = Field(..., min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("resume_text", "job_description", "company", "role")
+    @classmethod
+    def _validate_optimized_cover_letter_inputs(cls, value: str, info) -> str:
+        return sanitize_and_validate_llm_text(value, info.field_name)
 
 
 class OptimizedCoverLetterResponse(BaseModel):

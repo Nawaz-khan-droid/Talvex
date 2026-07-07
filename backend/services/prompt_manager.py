@@ -278,3 +278,26 @@ def get_prompt_metadata(template_name: str) -> dict[str, Any]:
 def list_prompts() -> dict[str, dict[str, Any]]:
     """Return all registered prompt templates and their metadata."""
     return {name: dict(meta) for name, meta in PROMPT_REGISTRY.items()}
+
+
+def validate_prompt_templates() -> None:
+    """Fail fast at startup when any registered prompt template is missing."""
+    missing: list[str] = []
+    for template_name, metadata in PROMPT_REGISTRY.items():
+        filename = metadata.get("filename", f"{template_name}.md")
+        filepath = _PROMPTS_DIR / str(filename)
+        if not filepath.exists():
+            missing.append(f"{template_name} -> {filename}")
+
+    if missing:
+        message = (
+            "Prompt template validation failed. Missing templates: "
+            + ", ".join(sorted(missing))
+        )
+        logger.critical(message)
+        raise RuntimeError(message)
+
+    logger.info(
+        "Prompt template validation passed (%d templates).",
+        len(PROMPT_REGISTRY),
+    )

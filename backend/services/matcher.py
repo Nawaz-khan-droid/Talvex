@@ -56,7 +56,7 @@ TECHNICAL_SKILLS: list[str] = [
     "sql server", "ssis", "ssrs", "ssas",
     "redshift", "bigquery", "snowflake", "databricks", "data warehouse",
     "looker", "qlik", "spotfire", "thoughtspot", "metabase",
-    "python数据分析", "r语言", "数据分析",
+    "python data analysis", "r language", "data analysis",
     "ab testing", "a/b testing", "hypothesis testing",
     "regression analysis", "predictive modeling", "forecasting",
     "data mining", "text mining", "sentiment analysis",
@@ -125,6 +125,13 @@ STOP_WORDS: set[str] = {
     "benefits", "opportunity", "team", "company", "role", "position",
     "candidate", "join", "based", "using", "building", "developing",
     "help", "ensure", "support", "provide", "create", "manage", "lead",
+}
+
+# Multilingual aliases are normalized to canonical English tokens before scoring.
+SKILL_ALIASES: dict[str, str] = {
+    "python数据分析": "python data analysis",
+    "r语言": "r language",
+    "数据分析": "data analysis",
 }
 
 
@@ -210,7 +217,8 @@ def extract_keywords(text: str) -> list[str]:
     """
     Extract keywords from text, filtering stop words and short words.
     """
-    cleaned = re.sub(r"[^a-z0-9+#.\-\/\s]", " ", text.lower())
+    normalized_text = _normalize_skill_aliases(text.lower())
+    cleaned = re.sub(r"[^a-z0-9+#.\-\/\s]", " ", normalized_text)
     words = cleaned.split()
     words = [w for w in words if len(w) > 1 and w not in STOP_WORDS]
     return sorted(set(words))
@@ -221,7 +229,7 @@ def extract_skills_from_text(text: str) -> list[str]:
     Extract known technical skills from text using the predefined skill list.
     Returns a sorted list of matched skill names.
     """
-    text_lower = text.lower()
+    text_lower = _normalize_skill_aliases(text.lower())
     found: list[str] = []
 
     for skill in TECHNICAL_SKILLS:
@@ -235,6 +243,13 @@ def extract_skills_from_text(text: str) -> list[str]:
             found.append(skill)
 
     return sorted(set(found))
+
+
+def _normalize_skill_aliases(text: str) -> str:
+    normalized = text
+    for alias, canonical in SKILL_ALIASES.items():
+        normalized = normalized.replace(alias.lower(), canonical)
+    return normalized
 
 
 # ============================================================
@@ -256,7 +271,11 @@ def calculate_match_score(
         dict with score (0-100), matched (list), missing (list)
     """
     jd_keywords = extract_keywords(job_description)
-    skills = [s.lower().strip() for s in persona_skills if s and s.strip()]
+    skills = [
+        _normalize_skill_aliases(s.lower().strip())
+        for s in persona_skills
+        if s and s.strip()
+    ]
 
     if not jd_keywords:
         return {"score": 0, "matched": [], "missing": []}

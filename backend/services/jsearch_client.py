@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
+from services.circuit_breaker import AsyncCircuitBreaker, CircuitBreakerConfig, CircuitBreakerOpenError
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,25 @@ HEADERS = {
     "x-rapidapi-key": JSEARCH_API_KEY,
     "x-rapidapi-host": JSEARCH_HOST,
 }
+
+_circuit_breaker = AsyncCircuitBreaker(
+    name="jsearch",
+    config=CircuitBreakerConfig(failure_threshold=4, recovery_timeout_seconds=45.0),
+)
+
+
+async def _get_with_circuit_breaker(url: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _do_request() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, headers=HEADERS, params=params)
+            response.raise_for_status()
+            return response.json()
+
+    try:
+        return await _circuit_breaker.call(_do_request)
+    except CircuitBreakerOpenError as exc:
+        logger.error("JSearch circuit breaker is OPEN for url=%s: %s", url, exc)
+        raise Exception("JSearch temporarily unavailable due to repeated upstream failures.") from exc
 
 
 async def search_jobs(
@@ -62,15 +82,15 @@ async def search_jobs(
     if date_posted:
         params["date_posted"] = date_posted
 
+    logger.info(
+        "JSearch search_jobs request query=%s country=%s num_pages=%s date_posted=%s",
+        query,
+        country,
+        num_pages,
+        date_posted or "",
+    )
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{JSEARCH_BASE_URL}/search-v2",
-                headers=HEADERS,
-                params=params,
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = await _get_with_circuit_breaker(f"{JSEARCH_BASE_URL}/search-v2", params)
     except httpx.HTTPStatusError as e:
         logger.error(f"JSearch API error {e.response.status_code}: {e.response.text}")
         raise Exception(f"JSearch API returned status {e.response.status_code}") from e
@@ -81,6 +101,7 @@ async def search_jobs(
     # Normalize response
     raw_results = data.get("data", [])
     results = [_normalize_job(result) for result in raw_results]
+    logger.info("JSearch search_jobs success total_results=%d", len(results))
 
     return {
         "results": results,
@@ -111,15 +132,9 @@ async def get_job_details(
     if country:
         params["country"] = country
 
+    logger.info("JSearch get_job_details request job_id=%s country=%s", job_id, country)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{JSEARCH_BASE_URL}/job-details",
-                headers=HEADERS,
-                params=params,
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = await _get_with_circuit_breaker(f"{JSEARCH_BASE_URL}/job-details", params)
     except httpx.HTTPStatusError as e:
         logger.error(f"JSearch API error {e.response.status_code}: {e.response.text}")
         raise Exception(f"JSearch API returned status {e.response.status_code}") from e
@@ -154,15 +169,9 @@ async def get_estimated_salary(
     if location:
         params["location"] = location
 
+    logger.info("JSearch get_estimated_salary request job_title=%s location=%s", job_title, location)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{JSEARCH_BASE_URL}/estimated-salary",
-                headers=HEADERS,
-                params=params,
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = await _get_with_circuit_breaker(f"{JSEARCH_BASE_URL}/estimated-salary", params)
     except httpx.HTTPStatusError as e:
         logger.error(f"JSearch API error {e.response.status_code}: {e.response.text}")
         raise Exception(f"JSearch API returned status {e.response.status_code}") from e
@@ -182,6 +191,7 @@ async def get_estimated_salary(
             "medianSalary": item.get("median_salary"),
         })
 
+    logger.info("JSearch get_estimated_salary success entries=%d", len(results))
     return results
 
 

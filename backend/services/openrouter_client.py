@@ -22,7 +22,7 @@ Model tier assignment (all free-tier on OpenRouter):
 
   Deep Analysis Layer:
     architect — PRIMARY: openai/gpt-oss-120b:free
-                FALLBACK: z-ai/glm-4.5-air:free
+                FALLBACK: google/gemma-4-26b-a4b-it:free
 
 Requires ``OPENROUTER_API_KEY`` to be set in the environment or ``.env`` file.
 Uses the official OpenAI Python SDK pointed at OpenRouter's
@@ -53,6 +53,7 @@ from openai import (
     NotFoundError,
     RateLimitError,
 )
+from services.circuit_breaker import AsyncCircuitBreaker, CircuitBreakerConfig, CircuitBreakerOpenError
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,6 @@ _OPENROUTER_EXTRA_HEADERS: dict[str, str] = {
     "X-Title": "TALVEX",
 }
 
-
 # ---------------------------------------------------------------------------
 # Agent role enum
 # ---------------------------------------------------------------------------
@@ -100,6 +100,14 @@ class AgentRole(str, Enum):
     PARSER = "parser"
     ARCHITECT = "architect"
     BUILDER = "builder"
+
+
+_ROLE_DEFAULTS: dict[AgentRole, tuple[str, str]] = {
+    AgentRole.SEARCHER: ("openai/gpt-oss-120b:free", "google/gemma-4-26b-a4b-it:free"),
+    AgentRole.PARSER: ("deepseek/deepseek-v4-flash:free", "qwen/qwen3-coder:free"),
+    AgentRole.ARCHITECT: ("openai/gpt-oss-120b:free", "google/gemma-4-26b-a4b-it:free"),
+    AgentRole.BUILDER: ("deepseek/deepseek-v4-flash:free", "qwen/qwen3-coder:free"),
+}
 
 
 # Mapping: AgentRole → (primary_env_var, fallback_env_var)
@@ -273,6 +281,10 @@ class OpenRouterClient:
         self._max_retries = max_retries
         self._retry_base_delay = retry_base_delay
         self._token_tracker = TokenUsageTracker()
+        self._breaker = AsyncCircuitBreaker(
+            name="openrouter",
+            config=CircuitBreakerConfig(failure_threshold=5, recovery_timeout_seconds=60.0),
+        )
 
         # Resolve primary + fallback model IDs --------------------------------
         overrides = model_overrides or {}
@@ -280,8 +292,9 @@ class OpenRouterClient:
         self._fallbacks: dict[AgentRole, str] = {}    # fallback
 
         for role, (primary_env, fallback_env) in _ROLE_ENV_MAP.items():
-            primary_id = overrides.get(role.value) or os.getenv(primary_env, "")
-            fallback_id = os.getenv(fallback_env, "")
+            default_primary, default_fallback = _ROLE_DEFAULTS[role]
+            primary_id = overrides.get(role.value) or os.getenv(primary_env, default_primary)
+            fallback_id = os.getenv(fallback_env, default_fallback)
 
             if not primary_id:
                 logger.warning(
@@ -385,13 +398,34 @@ class OpenRouterClient:
             OpenRouterAllModelsFailedError: If both primary and fallback fail.
             OpenRouterError / subclass: On non-retryable API failures.
         """
+        try:
+            return await self._breaker.call(
+                self._call_with_fallback,
+                model_role=model_role,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                json_mode=json_mode,
+            )
+        except CircuitBreakerOpenError as exc:
+            logger.error("OpenRouter circuit breaker rejected request: %s", exc)
+            raise OpenRouterError(str(exc)) from exc
+
+    async def _call_with_fallback(
+        self,
+        *,
+        model_role: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+    ) -> str:
         if not self._api_key:
             raise OpenRouterAuthError(
                 "OpenRouter API key not configured. "
                 "Please set the OPENROUTER_API_KEY environment variable."
             )
 
-        # Validate role -------------------------------------------------------
         try:
             role = AgentRole(model_role)
         except ValueError:
@@ -411,7 +445,6 @@ class OpenRouterClient:
 
         tier_name = _TIER_NAMES.get(role, role.value)
 
-        # --- Step 1: Try primary model with retries -------------------------
         logger.info(
             "[%s] Calling primary model: %s (max_retries=%d)",
             tier_name, primary_id, self._max_retries,
@@ -427,7 +460,6 @@ class OpenRouterClient:
             logger.info("[%s] Primary model succeeded: %s", tier_name, primary_id)
             return result
         except (OpenRouterAuthError, OpenRouterModelError):
-            # Non-retryable errors — don't bother with fallback
             raise
         except OpenRouterError as primary_exc:
             logger.warning(
@@ -435,7 +467,6 @@ class OpenRouterClient:
                 tier_name, primary_id, self._max_retries, primary_exc,
             )
 
-        # --- Step 2: Escalate to fallback model -----------------------------
         if not fallback_id:
             logger.error(
                 "[%s] No fallback model configured for role '%s'. "
@@ -459,12 +490,10 @@ class OpenRouterClient:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                max_attempts=1,  # Only 1 attempt on fallback
+                max_attempts=1,
                 json_mode=json_mode,
             )
-            logger.info(
-                "[%s] Fallback model succeeded: %s", tier_name, fallback_id,
-            )
+            logger.info("[%s] Fallback model succeeded: %s", tier_name, fallback_id)
             return result
         except OpenRouterError as fallback_exc:
             logger.error(
