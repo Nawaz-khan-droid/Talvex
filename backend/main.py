@@ -130,6 +130,9 @@ async def lifespan(app: FastAPI):
     """Application startup/shutdown events."""
     # Startup: verify database connection
     logger.info("TALVEX Backend starting up (Zero Trust mode)...")
+    from services.prompt_manager import validate_prompt_templates
+    validate_prompt_templates()
+
     try:
         from sqlalchemy import text
         async with AsyncSessionLocal() as db:

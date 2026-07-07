@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
+from services.circuit_breaker import AsyncCircuitBreaker, CircuitBreakerConfig, CircuitBreakerOpenError
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,11 @@ _JOB_SITE_FILTERS = [
     "site:glassdoor.com",
     "site:wellfound.com",
 ]
+
+_circuit_breaker = AsyncCircuitBreaker(
+    name="tavily",
+    config=CircuitBreakerConfig(failure_threshold=4, recovery_timeout_seconds=45.0),
+)
 
 
 class TavilyClient:
@@ -107,9 +113,23 @@ class TavilyClient:
             "search_depth": "advanced",
         }
 
+        logger.info(
+            "Tavily search_jobs request title=%s location=%s employment_type=%s max_results=%d",
+            job_title,
+            location,
+            employment_type,
+            max_results,
+        )
+
+        async def _do_request() -> httpx.Response:
+            return await self._client.post(url=TAVILY_BASE_URL, json=payload)
+
         try:
-            response = await self._client.post(url=TAVILY_BASE_URL, json=payload)
+            response = await _circuit_breaker.call(_do_request)
             response.raise_for_status()
+        except CircuitBreakerOpenError as exc:
+            logger.error("Tavily circuit breaker is OPEN: %s", exc)
+            return []
         except httpx.HTTPStatusError as exc:
             logger.error(
                 "Tavily API error %s: %s",
@@ -122,7 +142,9 @@ class TavilyClient:
             return []
 
         data = response.json()
-        return self._parse_results(data)
+        parsed = self._parse_results(data)
+        logger.info("Tavily search_jobs success results=%d", len(parsed))
+        return parsed
 
     async def close(self) -> None:
         """Close the underlying httpx client."""

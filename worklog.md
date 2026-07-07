@@ -26,3 +26,18 @@ Stage Summary:
 - Zero performance impact: usage logging is fire-and-forget (asyncio.create_task)
 - Credit system: per-service costs, auto-deduction, user balances
 - All code validated syntactically
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Scope Freeze Cleanup + Blocker Fixes
+
+Tracked Issues:
+- [x] Chinese comments/log strings in `/home/runner/work/Talvex/Talvex/.zscripts/*.sh`
+- [x] Chinese skill tokens in `/home/runner/work/Talvex/Talvex/backend/services/matcher.py` normalized via multilingual aliases
+- [x] z-ai provider references removed from runtime/docs (`openrouter_client.py`, `README.md`)
+- [x] Startup prompt template validation wired (`prompt_manager.py`, `main.py`)
+- [x] Circuit breaker integrated for OpenRouter, JSearch, Tavily clients
+- [x] LLM input hardening added in schema validation path and router request models
+- [x] Rate limiter moved to Redis-backed durable state with in-memory fallback
+- [x] Additional structured logging added in touched external API services

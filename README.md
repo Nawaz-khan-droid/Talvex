@@ -96,7 +96,7 @@ intelligent job search, resume optimization, and comprehensive admin analytics.
 |------|--------------|----------------|---------|
 | SEARCHER | openai/gpt-oss-120b:free | google/gemma-4-26b-a4b-it:free | Conversation, intent routing |
 | PARSER | deepseek/deepseek-v4-flash:free | qwen/qwen3-coder:free | JD parsing, content extraction |
-| ARCHITECT | openai/gpt-oss-120b:free | z-ai/glm-4.5-air:free | Deep analysis, ATS scoring |
+| ARCHITECT | openai/gpt-oss-120b:free | google/gemma-4-26b-a4b-it:free | Deep analysis, ATS scoring |
 | BUILDER | deepseek/deepseek-v4-flash:free | qwen/qwen3-coder:free | Resume generation |
 
 ## Getting Started
@@ -128,9 +128,13 @@ TAVILY_API_KEY=<your-tavily-key>
 
 # Model Configuration
 OPENROUTER_MODEL_SEARCHER=openai/gpt-oss-120b:free
+OPENROUTER_MODEL_SEARCHER_FALLBACK=google/gemma-4-26b-a4b-it:free
 OPENROUTER_MODEL_ARCHITECT=openai/gpt-oss-120b:free
+OPENROUTER_MODEL_ARCHITECT_FALLBACK=google/gemma-4-26b-a4b-it:free
 OPENROUTER_MODEL_PARSER=deepseek/deepseek-v4-flash:free
+OPENROUTER_MODEL_PARSER_FALLBACK=qwen/qwen3-coder:free
 OPENROUTER_MODEL_BUILDER=deepseek/deepseek-v4-flash:free
+OPENROUTER_MODEL_BUILDER_FALLBACK=qwen/qwen3-coder:free
 ```
 
 ### Local Development

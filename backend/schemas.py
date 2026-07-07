@@ -5,6 +5,7 @@ Configured for ORM mode to work with SQLAlchemy models.
 """
 
 from datetime import datetime
+import re
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,6 +20,34 @@ def _title_case_status(status: Optional[str]) -> Optional[str]:
     if not status:
         return status
     return status.title()
+
+
+_PROMPT_INJECTION_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"ignore\s+(all\s+)?previous\s+(instructions?|prompts?)", re.IGNORECASE),
+    re.compile(r"forget\s+(all\s+)?previous\s+(instructions?|prompts?)", re.IGNORECASE),
+    re.compile(r"disregard\s+(all\s+)?previous\s+(instructions?|prompts?)", re.IGNORECASE),
+    re.compile(r"system\s*prompt", re.IGNORECASE),
+    re.compile(r"you\s+are\s+now", re.IGNORECASE),
+    re.compile(r"act\s+as\s+(a|an)\s+", re.IGNORECASE),
+    re.compile(r"jailbreak", re.IGNORECASE),
+    re.compile(r"<\|im_start\|>|<\|im_end\|>|\[INST\]|</s>", re.IGNORECASE),
+]
+
+
+def detect_prompt_injection_patterns(text: str) -> list[str]:
+    if not text:
+        return []
+    return [pattern.pattern for pattern in _PROMPT_INJECTION_PATTERNS if pattern.search(text)]
+
+
+def sanitize_and_validate_llm_text(text: str, field_name: str = "input") -> str:
+    normalized = re.sub(r"\s+", " ", (text or "")).strip()
+    matches = detect_prompt_injection_patterns(normalized)
+    if matches:
+        raise ValueError(
+            f"{field_name} contains suspicious prompt-injection patterns: {', '.join(matches[:3])}"
+        )
+    return normalized
 
 
 # ============================================================
